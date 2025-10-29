@@ -22,7 +22,7 @@ Features include:
 
 ```bash
 # clone + enter
-git clone https://github.com/<your-username>/tftools.git
+git clone https://github.com/Thats-alot/tftools.git
 cd tftools
 
 # create & activate a venv (recommended)
