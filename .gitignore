@@ -1,9 +1,58 @@
+# --- OS cruft ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- Editors/IDEs ---
+.vscode/
+.idea/
+.history/
+
+# --- Python build artifacts ---
 __pycache__/
-*.pyc
+*.py[cod]
+*.so
+*.pyd
 *.pyo
-*.DS_Store
-.env
-.venv
-dist/
+*.pyd
+.build/
 build/
+dist/
 *.egg-info/
+
+# --- Virtual envs / tooling ---
+.venv/
+venv/
+env/
+.conda/
+.python-version
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- Logs / caches ---
+*.log
+logs/
+.cache/
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# --- Secrets / local config ---
+.env
+.env.*
+*.key
+*.pem
+
+# --- Data you do NOT want in Git ---
+# Keep TF corpora caches and large datasets out of the repo.
+text-fabric-data/
+**/text-fabric-data/
+data/
+data/**
+
+# --- OS-specific metadata in subfolders (just in case) ---
+**/.DS_Store

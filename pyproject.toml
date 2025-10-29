@@ -1,20 +1,49 @@
 [build-system]
-requires = ["hatchling>=1.18"]
+requires = ["hatchling>=1.24"]
 build-backend = "hatchling.build"
 
 [project]
 name = "tftools"
-version = "0.0.1"
-description = "Research helpers for Text-Fabric data (BHSA, DSS, etc.)"
+version = "0.0.0"                       # static since you're not versioning yet
+description = "Research tools for text-fabric (for BHSA, LXX, etc.)"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = [
+license = { text = "MIT" }
+authors = [{ name = "sail0r" }]
+keywords = ["text-fabric", "BHSA", "LXX", "DSS", "GNT", "biblical-languages"]
+dependencies = []                        # keep base tiny
+
+[project.optional-dependencies]
+tf = ["text-fabric>=11"]
+viz = [
+  "pandas>=2.0",
+  "numpy>=1.26",
+  "matplotlib>=3.7",
+  "seaborn>=0.13"
+]
+nb = ["nbformat>=5.9"]                   # for tftools.nbstrip utilities
+full = [
   "text-fabric>=11",
   "pandas>=2.0",
-  "numpy>=1.26"
+  "numpy>=1.26",
+  "matplotlib>=3.7",
+  "seaborn>=0.13",
+  "nbformat>=5.9"
 ]
-authors = [{ name = "sail0r" }]
-license = { text = "MIT" }
+dev = [
+  "pytest>=7",
+  "pre-commit>=3",
+  "ruff>=0.6"
+]
+
+[project.urls]
+Homepage = "https://github.com/Thats-alot/tftools"
+Issues   = "https://github.com/Thats-alot/tftools/issues"
+
+# Optional convenience CLI for the notebook-stripper
+# (requires the `nb` extra to actually run).
+[project.scripts]
+tft-nbstrip = "tftools.nbstrip:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tftools"]
