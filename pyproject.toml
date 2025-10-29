@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tftools"
+version = "0.0.1"
+description = "Research helpers for Text-Fabric data (BHSA, DSS, etc.)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "text-fabric>=11",
+  "pandas>=2.0",
+  "numpy>=1.26"
+]
+authors = [{ name = "sail0r" }]
+license = { text = "MIT" }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tftools"]
