@@ -45,6 +45,15 @@ _ALIASES: Dict[str, str] = {
 def _resolve_ns(ns):
     if ns is not None:
         return ns
+    # Prefer IPython's notebook namespace when present (Jupyter/VS Code)
+    try:
+        from IPython import get_ipython
+        ip = get_ipython()
+        if ip is not None and hasattr(ip, "user_ns"):
+            return ip.user_ns
+    except Exception:
+        pass
+    # Fallback: caller's globals
     import inspect
     fr = inspect.currentframe()
     try:
