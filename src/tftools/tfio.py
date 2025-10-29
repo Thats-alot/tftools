@@ -1,110 +1,128 @@
-# tftools/tfio.py
 from __future__ import annotations
-from typing import Optional, Tuple, Any
+from dataclasses import dataclass
+from typing import Optional, Dict, Any, Tuple, Iterable
 
-def load_dataset(
-    spec: str,
-    *,
-    version: Optional[str] = None,
-    mod: Optional[str] = None,
-    ns: Optional[dict] = None,
-    aliases: Tuple[str, ...] | None = None,
-    include_S: bool = True,
-    verbose: bool = True,
-):
+# ---- Dataset specs & hoisted names -----------------------------------------
+
+@dataclass(frozen=True)
+class DatasetSpec:
+    spec: str
+    version: Optional[str] = None
+    mod: Optional[str] = None
+    hoist_names: Tuple[str, ...] = ()  # names to inject into ns in this order: F, L, T, (S)
+
+DEFAULT_SPECS: Dict[str, DatasetSpec] = {
+    "B": DatasetSpec("etcbc/bhsa", "2021", "CenterBLC/BHSaddons/tf",
+                     ("Fbhs","Lbhs","Tbhs","Sbhs")),
+    "L": DatasetSpec("CenterBLC/LXX", "1935", None,
+                     ("Flxx","Llxx","Tlxx","Slxx")),
+    "D": DatasetSpec("etcbc/dss", "1.9", None,
+                     ("Fdss","Ldss","Tdss","Sdss")),
+    "M": DatasetSpec("sergpanf/LXX-Link-P", "0.0.8", None,
+                     ("Fhb","Lhb","Thb")),  # no S
+    "N": DatasetSpec("CenterBLC/N1904", "1.0.0", "CenterBLC/N1904/BOLcomplement/tf/",
+                     ("Fgnt","Lgnt","Tgnt","Sgnt")),
+}
+
+# ---- Tiny sentinels so you can call load_dataset(B) etc. -------------------
+
+class _Key(str): pass
+B = _Key("B"); BHSA = B
+L = _Key("L"); LXX  = L
+D = _Key("D"); DSS  = D
+M = _Key("M"); MACULA = M
+N = _Key("N"); GNT  = N
+
+# Accept many spellings
+_ALIASES: Dict[str, str] = {
+    "b":"B","bhsa":"B","bhsa2021":"B",
+    "l":"L","lxx":"L","centerblc/lxx":"L","lxx1935":"L",
+    "d":"D","dss":"D",
+    "m":"M","macula":"M","lxx-link-p":"M","linkp":"M","lxxlinkp":"M",
+    "n":"N","gnt":"N","n1904":"N",
+}
+
+def _resolve_ns(ns):
+    if ns is not None:
+        return ns
+    import inspect
+    fr = inspect.currentframe()
+    try:
+        return fr.f_back.f_globals if fr and fr.f_back else globals()
+    finally:
+        del fr
+
+def _normalize_keys(which: Iterable[Any]) -> Tuple[str, ...]:
+    out: list[str] = []
+    for w in which:
+        if isinstance(w, _Key):
+            key = str(w)
+        elif isinstance(w, str):
+            key = _ALIASES.get(w.strip().lower(), None)
+            if key is None:
+                # allow exact canonical names too
+                key = w.strip().upper()
+        else:
+            raise TypeError(f"Unsupported dataset selector: {w!r}")
+        if key not in DEFAULT_SPECS:
+            raise ValueError(f"Unknown dataset key/name: {w!r}")
+        if key not in out:
+            out.append(key)
+    return tuple(out)
+
+# ---- The one function you call ---------------------------------------------
+
+def load_dataset(*which: Any, ns: dict | None = None, verbose: bool = True):
     """
-    Load a Text-Fabric dataset via tf.app.use and return (A, F, L, T, S?).
-    If ns=globals() and aliases are provided, hoist those names into the caller's namespace.
+    Minimal-typing loader.
 
-    aliases:
-      - 3 names -> F, L, T
-      - 4 names -> F, L, T, S   (S will be None if not present)
+    Usage:
+      load_dataset()                -> loads ALL (B,L,D,M,N) and hoists names into caller globals
+      load_dataset(B)               -> BHSA only
+      load_dataset("BHSA")          -> BHSA only
+      load_dataset(L, "GNT")        -> LXX (1935) + N1904
+      load_dataset("macula", "dss") -> Macula LXX-Link-P + DSS
+
+    Hoisted names:
+      B: Fbhs, Lbhs, Tbhs, Sbhs
+      L: Flxx, Llxx, Tlxx, Slxx
+      D: Fdss, Ldss, Tdss, Sdss
+      M: Fhb,  Lhb,  Thb
+      N: Fgnt, Lgnt, Tgnt, Sgnt
+
+    Returns a dict like:
+      {"B":{"A":A,"F":F,"L":L,"T":T,"S":S}, "L":{...}, ...}
     """
     from tf.app import use
 
-    if verbose:
-        print(f"📦 use('{spec}', version={version!r}, mod={mod!r})")
+    ns = _resolve_ns(ns)
+    keys: Tuple[str, ...] = _normalize_keys(which) if which else ("B","L","D","M","N")
 
-    A = use(spec, version=version, mod=mod, hoist=False)
-    F, L, T = A.api.F, A.api.L, A.api.T
-    S = getattr(A.api, "S", None) if include_S else None
+    bag: Dict[str, Dict[str, Any]] = {}
 
-    if ns is not None and aliases:
-        vals = (F, L, T, S)[: len(aliases)]
-        ns.update(dict(zip(aliases, vals)))
+    for k in keys:
+        spec = DEFAULT_SPECS[k]
+        if verbose:
+            print(f"📦 Loading {k}: {spec.spec} (version={spec.version}, mod={spec.mod})")
+        try:
+            A = use(spec.spec, version=spec.version, mod=spec.mod, hoist=False)
+        except Exception as e:
+            msg = str(e)
+            if "rate limit" in msg.lower() or "403" in msg:
+                print("⚠️ GitHub rate-limit while fetching TF data. "
+                      "Export GHPERS=<your-token> in your shell and retry.")
+            raise
+        F, Lx, T = A.api.F, A.api.L, A.api.T
+        S = getattr(A.api, "S", None)
 
-    return (A, F, L, T, S)
+        # Hoist with your preferred names
+        if spec.hoist_names:
+            vals = (F, Lx, T, S)[:len(spec.hoist_names)]
+            ns.update(dict(zip(spec.hoist_names, vals)))
 
-# --- Convenience wrappers matching your preferred names ----------------------
+        bag[k] = {"A": A, "F": F, "L": Lx, "T": T, "S": S}
 
-def load_bhsa(ns=None, version: str = "2021", mod: str = "CenterBLC/BHSaddons/tf", verbose: bool = True):
-    """
-    Loads BHSA (BHS) and hoists: Fbhs, Lbhs, Tbhs, Sbhs
-    """
-    return load_dataset(
-        "etcbc/bhsa",
-        version=version,
-        mod=mod,
-        ns=ns,
-        aliases=("Fbhs", "Lbhs", "Tbhs", "Sbhs"),
-        include_S=True,
-        verbose=verbose,
-    )
+    return bag
 
-def load_lxx_1935(ns=None, version: str = "1935", verbose: bool = True):
-    """
-    Loads CenterBLC LXX (1935) and hoists: Flxx, Llxx, Tlxx, Slxx
-    """
-    return load_dataset(
-        "CenterBLC/LXX",
-        version=version,
-        mod=None,
-        ns=ns,
-        aliases=("Flxx", "Llxx", "Tlxx", "Slxx"),
-        include_S=True,
-        verbose=verbose,
-    )
-
-def load_dss(ns=None, version: str = "1.9", verbose: bool = True):
-    """
-    Loads ETCBC DSS and hoists: Fdss, Ldss, Tdss, Sdss
-    """
-    return load_dataset(
-        "etcbc/dss",
-        version=version,
-        mod=None,
-        ns=ns,
-        aliases=("Fdss", "Ldss", "Tdss", "Sdss"),
-        include_S=True,
-        verbose=verbose,
-    )
-
-def load_macula_lxx_linkp(ns=None, version: str = "0.0.8", verbose: bool = True):
-    """
-    Loads Macula LXX-Link-P and hoists: Fhb, Lhb, Thb
-    (no S in this app)
-    """
-    A, F, L, T, S = load_dataset(
-        "sergpanf/LXX-Link-P",
-        version=version,
-        mod=None,
-        ns=ns,
-        aliases=("Fhb", "Lhb", "Thb"),
-        include_S=False,
-        verbose=verbose,
-    )
-    return (A, F, L, T, S)
-
-def load_n1904(ns=None, version: str = "1.0.0", mod: str = "CenterBLC/N1904/BOLcomplement/tf/", verbose: bool = True):
-    """
-    Loads CenterBLC N1904 (+ BOLcomplement) and hoists: Fgnt, Lgnt, Tgnt, Sgnt
-    """
-    return load_dataset(
-        "CenterBLC/N1904",
-        version=version,
-        mod=mod,
-        ns=ns,
-        aliases=("Fgnt", "Lgnt", "Tgnt", "Sgnt"),
-        include_S=True,
-        verbose=verbose,
-    )
+# ultra-short alias if you want: tt.ld(...)
+ld = load_dataset

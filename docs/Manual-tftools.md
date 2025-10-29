@@ -53,6 +53,10 @@ pip install -e '.[full,dev]'  # everything + dev tools (ruff, pytest, pre-commit
 
 In a Jupyter notebook or VS Code:
 
+## Quick Start
+
+In a Jupyter notebook or VS Code:
+
 ```python
 %load_ext autoreload
 %autoreload 2
@@ -62,21 +66,21 @@ import tftools as tt
 # Pull your usual libs (pd/np/plt/…)
 tt.quick_import(globals())
 
-# Load your standard corpora with your preferred variable names:
-tt.tfio.load_bhsa(ns=globals())              # Fbhs, Lbhs, Tbhs, Sbhs
-tt.tfio.load_lxx_1935(ns=globals())          # Flxx, Llxx, Tlxx, Slxx
-tt.tfio.load_dss(ns=globals())               # Fdss, Ldss, Tdss, Sdss
-tt.tfio.load_macula_lxx_linkp(ns=globals())  # Fhb, Lhb, Thb
-tt.tfio.load_n1904(ns=globals())             # Fgnt, Lgnt, Tgnt, Sgnt
+# Load ALL datasets & hoist your usual names (Fbhs/Lbhs/Tbhs/…, Flxx/…, etc.)
+tt.load_dataset()          # or: tt.ld()
+
+# Examples for subsets (optional):
+# tt.load_dataset(tt.B)          # BHSA only
+# tt.load_dataset(tt.L, tt.N)    # LXX (1935) + GNT (N1904)
+# tt.ld(tt.M, "D")               # Macula LXX-Link-P + DSS
 
 # Example: first BHSA verse
 v = next(iter(Tbhs.otype.s("verse")))
-
-tt.ref_sbl(Tbhs, v)                 # -> 'Gen 1:1' (SBL)
-tt.ref_dataset(Tbhs, v)             # -> 'Genesis 1:1' (dataset label)
+print(tt.ref_sbl(Tbhs, v))       # -> 'Gen 1:1' (SBL)
+print(tt.ref_dataset(Tbhs, v))   # -> 'Genesis 1:1' (dataset label)
 
 # Words of the verse (auto feature fallback: BHSA g_cons_utf8, LXX g_word_utf8, else text)
-tt.verse_words(Fbhs, Lbhs, Tbhs, v, feature='default')
+tt.verse_words(Fbhs, Lbhs, Tbhs, v, feature="default")
 ```
 
 ---
