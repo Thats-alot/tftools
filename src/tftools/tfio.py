@@ -123,6 +123,7 @@ def load_dataset(*which: Any, ns: dict | None = None, verbose: bool = True):
             raise
         F, Lx, T = A.api.F, A.api.L, A.api.T
         S = getattr(A.api, "S", None)
+        ns[k] = A # <— hoist the app as a single-letter key: B/L/D/M/N
 
         # Hoist with your preferred names
         if spec.hoist_names:
