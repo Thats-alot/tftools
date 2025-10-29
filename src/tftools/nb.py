@@ -3,6 +3,16 @@ from __future__ import annotations
 from typing import Dict, Any, Optional
 import importlib
 
+def _user_ns_or_none():
+    try:
+        from IPython import get_ipython
+        ip = get_ipython()
+        if ip is not None and hasattr(ip, "user_ns"):
+            return ip.user_ns
+    except Exception:
+        pass
+    return None
+
 def quick_import(
     ns: Optional[dict] = None,
     *,
@@ -11,13 +21,7 @@ def quick_import(
     strict: bool = True,
 ) -> Dict[str, Any]:
     """
-    Import common libs for TF notebooks.
-
-    Call with no args for the full set:
-        quick_import()  # seaborn + openpyxl included
-
-    If a package is missing and strict=True (default), a friendly error is raised
-    with an exact pip command ('pip install -e ".[full]"' or minimal package list).
+    Import common libs. In Jupyter, auto-injects into the notebook's namespace by default.
     """
     wanted = {
         "sys": "sys",
@@ -61,25 +65,23 @@ def quick_import(
                 obj = importlib.import_module(spec)
             out[alias] = obj
         except ModuleNotFoundError:
-            # record the base module name that failed
-            base = spec.split(":", 1)[0]
-            missing.add(base)
+            missing.add(spec.split(":", 1)[0])
 
-    # sensible matplotlib default if present
     if "plt" in out:
         out["plt"].rcdefaults()
 
     if missing and strict:
-        # Suggest a single command that fixes everything
         pkgs = " ".join(sorted(missing))
         raise RuntimeError(
-            f"Missing packages: {', '.join(sorted(missing))}.\n"
-            f"Install with:\n"
-            f"  pip install -e '.[full]'\n"
-            f"or minimally:\n"
+            "Missing packages: " + ", ".join(sorted(missing)) + "\n"
+            "Install with:\n"
+            "  pip install -e '.[full]'\n"
+            "or minimally:\n"
             f"  pip install {pkgs}\n"
         )
 
-    if ns is not None:
-        ns.update(out)
+    # 🔑 Auto-inject into Jupyter notebook globals by default
+    target_ns = ns if ns is not None else _user_ns_or_none()
+    if target_ns is not None:
+        target_ns.update(out)
     return out
