@@ -46,6 +46,13 @@ def _T_from_dskey(dskey: str):
         f"Make sure you've run your usual use(...), e.g. B = use(...); Tbhs = B.api.T"
     )
 
+def first_existing_feature(F, *names):
+    """Return the first feature name present on F from the given candidates, else None."""
+    for n in names:
+        if hasattr(F, n):
+            return n
+    return None
+
 # --- UPDATED: getref accepts (T, node) OR (node, 'B') -----------------------
 def getref(arg1, arg2=None, *, style: str = "sbl") -> str:
     """
