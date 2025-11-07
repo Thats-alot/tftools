@@ -43,7 +43,8 @@ def _resolve_ds(ds: str) -> Tuple[Any, Any, Any]:
         raise NameError(f"Dataset {ds!r} not loaded (missing {missing.args[0]}).") from None
 
 # ---------- SBL mapping (robust: uses tftools.booknm if available) ----------
-
+# ---------- SBL mapping helper (robust) ----------
+# Try to use your real converter; if it isn't importable, fall back to a static map.
 _SBL_FALLBACK = {
     'Genesis':'Gen','Exodus':'Exod','Leviticus':'Lev','Numeri':'Num','Deuteronomium':'Deut',
     'Josua':'Josh','Judices':'Judg','Ruth':'Ruth','Samuel_I':'1 Sam','Samuel_II':'2 Sam',
@@ -55,21 +56,24 @@ _SBL_FALLBACK = {
     'Sacharia':'Zech','Maleachi':'Mal'
 }
 
-def _book_maps(F, T) -> Tuple[Dict[str, str], Dict[str, str]]:
+def _to_sbl(book: str) -> str:
+    try:
+        from .booknm import to_sbl as _real_to_sbl
+        return _real_to_sbl(book, strict=False)
+    except Exception:
+        # graceful fallback if booknm.to_sbl isn't available
+        return _SBL_FALLBACK.get(book, book)
+
+def _book_maps(F, T):
     """
-    Build two maps for this dataset:
-      ds_book -> SBL, and SBL -> ds_book
+    ds_book -> SBL, and SBL -> ds_book.
     Works whether sectionFromNode(bookNode) returns 'Genesis' or ('Genesis',).
     """
-    ds_to_sbl: Dict[str, str] = {}
-    sbl_to_ds: Dict[str, str] = {}
+    ds_to_sbl = {}
+    sbl_to_ds = {}
     for bnode in F.otype.s("book"):
         sect = T.sectionFromNode(bnode)
-        # unify to a single book label string
-        if isinstance(sect, (tuple, list)):
-            book = sect[0] if sect else None
-        else:
-            book = sect
+        book = sect[0] if isinstance(sect, (tuple, list)) else sect
         if not book:
             continue
         sbl = _to_sbl(book)
