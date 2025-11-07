@@ -55,26 +55,26 @@ _SBL_FALLBACK = {
     'Sacharia':'Zech','Maleachi':'Mal'
 }
 
-def _to_sbl(book: str) -> str:
-    try:
-        from .booknm import to_sbl as _to_sbl
-        return _to_sbl(book, strict=False)
-    except Exception:
-        return _SBL_FALLBACK.get(book, book)
-
 def _book_maps(F, T) -> Tuple[Dict[str, str], Dict[str, str]]:
     """
     Build two maps for this dataset:
       ds_book -> SBL, and SBL -> ds_book
+    Works whether sectionFromNode(bookNode) returns 'Genesis' or ('Genesis',).
     """
     ds_to_sbl: Dict[str, str] = {}
     sbl_to_ds: Dict[str, str] = {}
     for bnode in F.otype.s("book"):
-        b, c, v = T.sectionFromNode(bnode)
-        if b:
-            s = _to_sbl(b)
-            ds_to_sbl[b] = s
-            sbl_to_ds[s] = b
+        sect = T.sectionFromNode(bnode)
+        # unify to a single book label string
+        if isinstance(sect, (tuple, list)):
+            book = sect[0] if sect else None
+        else:
+            book = sect
+        if not book:
+            continue
+        sbl = _to_sbl(book)
+        ds_to_sbl[book] = sbl
+        sbl_to_ds[sbl] = book
     return ds_to_sbl, sbl_to_ds
 
 # ---------- small TF helpers ----------
@@ -197,16 +197,23 @@ _PART = re.compile(
 
 def _sbl_to_ds_book(F, T, token: str) -> str:
     ds_to_sbl, sbl_to_ds = _book_maps(F, T)
-    sbl = _to_sbl(token)
+    tok = re.sub(r"\s+", " ", token).strip()
+
+    # 1) Exact SBL match
+    sbl = _to_sbl(tok)
     if sbl in sbl_to_ds:
         return sbl_to_ds[sbl]
-    # maybe the token is already dataset label
-    if token in ds_to_sbl:
-        return token
-    # try capitalization-insensitive hit on dataset labels
+
+    # 2) Case-insensitive SBL match (e.g., 'amos' -> 'Amos')
+    for s in sbl_to_ds:
+        if tok.lower() == s.lower():
+            return sbl_to_ds[s]
+
+    # 3) Case-insensitive dataset-label match (e.g., 'genesis' -> 'Genesis')
     for dsb in ds_to_sbl:
-        if dsb.lower() == token.lower():
+        if tok.lower() == dsb.lower():
             return dsb
+
     raise ValueError(f"Book not recognized in this dataset: {token!r}")
 
 def _verses_from_spec(F, T, spec: str) -> List[int]:
