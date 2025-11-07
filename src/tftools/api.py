@@ -100,16 +100,55 @@ def _ref_string(T, node: int, style: str = "sbl") -> str:
         return out
     return f"{out} {c}:{v}" if v is not None else f"{out} {c}"
 
-def _tokens_for_vnode(F, L, T, vnode: int, *, for_ds: str) -> List[str]:
-    # default per dataset; BHSA -> g_cons / g_cons_utf8
-    if for_ds.upper() in {"B", "BHSA"}:
-        feat = _first_feature(F, "g_cons_utf8", "g_cons")
-    else:
-        feat = _first_feature(F, "g_word_utf8", "text")
-    if feat is None:
-        feat = "text"
-    fobj = getattr(F, feat)
+def _tokens_for_vnode(F, L, T, vnode: int, *, for_ds: str) -> list[str]:
+    """Tokenize a verse node using dataset-specific feature priorities."""
+    for cand in _preferred_word_features_for(for_ds):
+        used, fobj = _get_feat(F, cand)
+        if fobj is not None:
+            return [fobj.v(w) for w in L.d(vnode, otype="word")]
+    # last resort
+    fobj = getattr(F, "text")
     return [fobj.v(w) for w in L.d(vnode, otype="word")]
+
+def _preferred_word_features_for(dskey: str) -> list[str]:
+    """Feature preference per dataset key."""
+    dskey = dskey.upper()
+    if dskey in {"B", "BHSA"}:
+        return ["g_cons", "g_word_utf8", "text"]
+    if dskey in {"M", "MACULA"}:
+        return ["mt_cons", "text"]
+    if dskey in {"L", "LXX"}:
+        # accept both hyphen and underscore forms; try 'word' before generic fallbacks
+        return ["g_cons-utf8", "g_cons_utf8", "word", "g_word_utf8", "text"]
+    if dskey in {"D", "DSS"}:
+        return ["g_cons", "text"]
+    # N/GNT or anything else: keep a safe default
+    return ["g_word_utf8", "text"]
+
+def _get_feat(F, name: str):
+    """
+    Get a TF feature accessor from F, being tolerant of hyphen vs. underscore.
+    Returns (feature_name_used, feature_object) or (None, None).
+    """
+    # exact
+    obj = getattr(F, name, None)
+    if obj is not None:
+        return name, obj
+    # hyphen ↔ underscore normalization
+    alt = name.replace("-", "_") if "-" in name else name.replace("_", "-")
+    obj = getattr(F, alt, None)
+    if obj is not None:
+        return alt, obj
+    return None, None
+
+def _select_base_feat(F, dskey: str) -> str:
+    """Pick the first available feature for this dataset according to your rules."""
+    for cand in _preferred_word_features_for(dskey):
+        used, obj = _get_feat(F, cand)
+        if obj is not None:
+            return used
+    # ultimate fallback
+    return "text"
 
 # ---------- parse node specs ----------
 
@@ -309,9 +348,7 @@ def getref(
         print(ref_s)
 
         if otherFeatures:
-            base_feat = "g_cons_utf8" if dskey == "B" and hasattr(F, "g_cons_utf8") else (
-                        "g_cons" if dskey == "B" and hasattr(F, "g_cons") else
-                        (_first_feature(F, "g_word_utf8", "text") or "text"))
+            base_feat = _select_base_feat(F, dskey)
             table = _word_table(F, L, T, vnode, ref_s, base_feat=base_feat, extra=otherFeatures)
             results.append(table)
             continue
@@ -366,9 +403,7 @@ def getver(
         print(ref_s)
 
         if otherFeatures:
-            base_feat = "g_cons_utf8" if dskey == "B" and hasattr(F, "g_cons_utf8") else (
-                        "g_cons" if dskey == "B" and hasattr(F, "g_cons") else
-                        (_first_feature(F, "g_word_utf8", "text") or "text"))
+            base_feat = _select_base_feat(F, dskey)
             table = _word_table(F, L, T, vnode, ref_s, base_feat=base_feat, extra=otherFeatures)
             results.append(table)
             continue
