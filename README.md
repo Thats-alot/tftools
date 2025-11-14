@@ -1,13 +1,14 @@
 # tftools
 
-Helpers for **Text-Fabric** notebooks across BHSA (BHS), CenterBLC LXX (1935), DSS, Macula LXX-Link-P, and N1904 (GNT).  
-Features include:
+Text-Fabric research helper tools.
 
-- One-liners to load your standard corpora with your **preferred variable names** (`Fbhs`, `Lbhs`, `Tbhs`, …)
-- Robust **book-name normalizer** → SBL abbreviations (e.g., `Reges II` → `2 Kgs`)
-- Easy **SBL citations** from TF nodes (`"Gen 1:1"`), verse word dumps with sensible feature fallbacks
-- A tiny **notebook importer** to pull your usual libs into `globals()`
-- Optional notebook **output stripper/truncater**
+Currently works with ETCBC's BHSA, CenterBLC's LXX, Dead Sea Scrolls, and Clear-Bible's Macula Hebrew Dataset.
+
+2 useful functions:
+
+getref(), used to get retrive the reference and verse from the word node number.
+
+getver(), used to retrive the verse from the verse's reference.
 
 ---
 
